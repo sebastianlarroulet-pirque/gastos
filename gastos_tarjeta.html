@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos Tarjeta</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;--border2:#3a3a3a;--text:#f0f0f0;--text2:#888;--text3:#555;--accent:#e8ff47;--accent2:#c8df2a;--green:#4ade80;--orange:#fb923c;--red:#f87171;--blue:#60a5fa;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+  header{padding:1.5rem 2.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:1.1rem;font-weight:500;letter-spacing:-0.02em;}
+  .header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .gs-pill{font-family:'DM Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;background:var(--surface2);color:var(--text3);}
+  .gs-pill.ok{background:#1a2e1a;color:var(--green);}
+  .container{max-width:960px;margin:0 auto;padding:1.5rem 2.5rem;}
+  .config-bar{display:flex;gap:10px;margin-bottom:1.5rem;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;font-family:'DM Mono',monospace;}
+  .field input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 11px;border-radius:6px;font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border 0.15s;}
+  .field input:focus{border-color:var(--accent);}
+  .field.token{flex:1;min-width:240px;}
+  .field.chatid{width:140px;}
+  .upload-zone{border:1px dashed var(--border2);border-radius:10px;padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface);}
+  .upload-zone:hover,.upload-zone.dragging{border-color:var(--accent);background:#1e1e14;}
+  .upload-icon{font-size:1.75rem;margin-bottom:0.5rem;opacity:0.4;}
+  .upload-title{font-size:14px;font-weight:500;margin-bottom:3px;}
+  .upload-sub{font-size:12px;color:var(--text2);}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:1.25rem 0;}
+  .metric{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0.875rem 1rem;}
+  .metric-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;font-family:'DM Mono',monospace;margin-bottom:5px;}
+  .metric-value{font-size:19px;font-weight:500;font-family:'DM Mono',monospace;}
+  .metric-value.accent{color:var(--accent);}
+  .metric-value.green{color:var(--green);}
+  .metric-value.orange{color:var(--orange);}
+  .progress-wrap{margin:0.75rem 0 1.25rem;}
+  .progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:5px;}
+  .progress-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.5s;}
+  .tabs{display:flex;gap:2px;margin-bottom:1.25rem;border-bottom:1px solid var(--border);}
+  .tab{padding:6px 14px;font-size:12px;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;transition:all 0.15s;font-family:'DM Mono',monospace;}
+  .tab:hover{color:var(--text2);}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
+  .card-title{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:1rem;font-weight:400;}
+  .pivot-wrap{overflow-x:auto;}
+  .pivot{width:100%;border-collapse:collapse;font-size:12px;font-family:'DM Mono',monospace;}
+  .pivot th{padding:7px 12px;text-align:right;font-size:10px;color:var(--text3);font-weight:400;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.05em;}
+  .pivot th:first-child{text-align:left;}
+  .pivot td{padding:6px 12px;border-bottom:1px solid var(--border);text-align:right;}
+  .pivot td:first-child{text-align:left;color:var(--text2);}
+  .pivot tbody tr:last-child td{border-top:1px solid var(--border2);border-bottom:none;font-weight:500;color:var(--text);}
+  .pivot tr:not(:last-child):hover td{background:var(--surface2);}
+  .cat-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:middle;}
+  .cat-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;}
+  .cat-row:last-child{border-bottom:none;}
+  .cat-name{min-width:150px;font-family:'DM Mono',monospace;color:var(--text2);}
+  .cat-bar-wrap{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .cat-bar{height:100%;border-radius:2px;}
+  .cat-val{min-width:80px;text-align:right;font-family:'DM Mono',monospace;}
+  .cat-pct{min-width:32px;text-align:right;color:var(--text3);font-family:'DM Mono',monospace;}
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .table-header{padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .table-header span{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;font-family:'DM Mono',monospace;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);font-weight:400;}
+  td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:var(--surface2);}
+  .desc-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);}
+  .monto-cell{text-align:right;font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums;}
+  .badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-family:'DM Mono',monospace;}
+  .badge-hist{background:#1a2e1a;color:var(--green);}
+  .badge-auto{background:#1a2414;color:#86efac;}
+  .badge-unk{background:#2e1a0a;color:var(--orange);}
+  .sel{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px;font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;outline:none;}
+  .sel:focus{border-color:var(--accent);}
+  .unk-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;}
+  .unk-row:last-child{border-bottom:none;}
+  .unk-fecha{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);min-width:78px;}
+  .unk-desc{flex:1;font-family:'DM Mono',monospace;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .unk-titular{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);min-width:65px;}
+  .unk-monto{font-family:'DM Mono',monospace;color:var(--orange);min-width:75px;text-align:right;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1.25rem;}
+  .btn{padding:8px 16px;border-radius:7px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text);transition:all 0.15s;}
+  .btn:hover{background:var(--surface2);}
+  .btn:active{transform:scale(0.97);}
+  .btn.primary{background:var(--accent);color:#0f0f0f;border-color:var(--accent);font-weight:600;}
+  .btn.primary:hover{background:var(--accent2);}
+  .btn.tg{background:#1a2535;color:var(--blue);border-color:#243040;}
+  .btn.tg:hover{background:#1f2d40;}
+  .btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .status{font-size:11px;font-family:'DM Mono',monospace;padding:5px 9px;border-radius:5px;}
+  .status.ok{background:#1a2e1a;color:var(--green);}
+  .status.err{background:#2e1a1a;color:var(--red);}
+  .status.info{background:var(--surface2);color:var(--text2);}
+  .hidden{display:none;}
+  .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+  @media(max-width:640px){.container{padding:1rem;}.metrics{grid-template-columns:repeat(2,1fr);}.summary-grid{grid-template-columns:1fr;}.config-bar{flex-direction:column;}.field.chatid{width:100%;}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Gastos Tarjeta</h1>
+  <div class="header-right">
+    <span id="gsPill" class="gs-pill">cargando reglas...</span>
+  </div>
+</header>
+<div class="container">
+  <div class="config-bar">
+    <div class="field token"><label>Token Telegram Bot</label><input type="password" id="tgToken" placeholder="1234567890:ABCdef..." /></div>
+    <div class="field chatid"><label>Chat ID</label><input type="text" id="tgChatId" placeholder="8718404770" /></div>
+    <button class="btn" onclick="testTg()">Probar Telegram</button>
+    <span id="tgStatus" class="status hidden"></span>
+  </div>
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(event)" />
+    <div class="upload-icon">⬆</div>
+    <div class="upload-title" id="uploadTitle">Subir Excel del período</div>
+    <div class="upload-sub" id="uploadSub">XLSX, XLS o CSV · arrastra o haz clic</div>
+  </div>
+  <div id="results" class="hidden">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Total cobro</div><div class="metric-value accent" id="mTotal">—</div></div>
+      <div class="metric"><div class="metric-label">Movimientos</div><div class="metric-value" id="mCount">—</div></div>
+      <div class="metric"><div class="metric-label">Resueltos</div><div class="metric-value green" id="mAuto">—</div></div>
+      <div class="metric"><div class="metric-label">Sin categoría</div><div class="metric-value orange" id="mUnk">—</div></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Cobertura histórica</span><span id="pctLabel">—</span></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="finalizePeriod()">✓ Finalizar período</button>
+      <button class="btn tg" id="btnTg" onclick="sendAllTelegram()" disabled>Enviar resumen a Telegram</button>
+      <span id="sendStatus" class="status hidden"></span>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('pivot')">Tabla resumen</div>
+      <div class="tab" onclick="showTab('cats')">Por categoría</div>
+      <div class="tab" onclick="showTab('unknowns')">Sin categoría</div>
+      <div class="tab" onclick="showTab('detail')">Detalle</div>
+    </div>
+    <div id="tab-pivot" class="tab-content active">
+      <div class="card"><div class="card-title">Resumen por categoría y titular</div><div class="pivot-wrap"><table class="pivot" id="pivotTable"></table></div></div>
+    </div>
+    <div id="tab-cats" class="tab-content">
+      <div class="summary-grid">
+        <div class="card"><div class="card-title">Por categoría</div><div id="catBreakdown"></div></div>
+        <div class="card"><div class="card-title">Por titular (DESC1)</div><div id="d1Breakdown"></div></div>
+      </div>
+    </div>
+    <div id="tab-unknowns" class="tab-content">
+      <div class="card"><div class="card-title" id="unkTitle">Sin categoría</div><div id="unkList"></div></div>
+    </div>
+    <div id="tab-detail" class="tab-content">
+      <div class="table-wrap">
+        <div class="table-header"><span>Detalle completo</span><span id="tableCount"></span></div>
+        <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+          <table><thead><tr><th>Fecha</th><th>Descripción</th><th>Titular</th><th>DESC1</th><th>Categoría</th><th style="text-align:right;">Valor cuota</th><th>Estado</th></tr></thead><tbody id="rowsBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const GS='https://script.google.com/macros/s/AKfycbw1GnLQXwFBBoFKPUx3yYhsmZWrRx1AAvqte-KX9yfKe6Mw5gDYVEmfs2MEuarUP93y/exec';
+const BASE={"CSM CENT MEDIC DEPO":{"d1":"SLC","d2":"medico"},"CINE HOYTS PUENTE ALTO":{"d1":"SLC","d2":"entretencion"},"THEA":{"d1":"SLC","d2":"salidas afuera"},"FUENTE MARDOQUEO ROGER":{"d1":"SLC","d2":"salidas afuera"},"MBI MALL BARRIO INDEPE":{"d1":"SLC","d2":"estacionamiento"},"ONECLICK CENCOMALLS":{"d1":"SLC","d2":"estacionamiento"},"SKECHERS MALL INDEP":{"d1":"SLC","d2":"otros"},"FURORE SPA":{"d1":"SLC","d2":"salidas afuera"},"MERPAGO*MATIAS NICOLAS":{"d1":"SLC","d2":"minimarket"},"MERPAGO*PEDRO DANIEL Q":{"d1":"SLC","d2":"minimarket"},"TUU*VERDULERIAAYLIN":{"d1":"SLC","d2":"minimarket"},"MERPAGO*JEAN SEBASTIAN":{"d1":"SLC","d2":"minimarket"},"MERPAGO*NATALIA ORTEGA":{"d1":"SLC","d2":"minimarket"},"MUEVO COPEC":{"d1":"SLC","d2":"bencina"},"SISA N877 PIRQUE":{"d1":"SLC","d2":"supermercado"},"CARNES FRUTANO PIRQUE":{"d1":"SLC","d2":"minimarket"},"MARIA ANTONIETA VENE":{"d1":"SLC","d2":"minimarket"},"CAMPERA SPA":{"d1":"MPP","d2":"otros"},"BKING VESPUCIO AUTO KI":{"d1":"SLC","d2":"salidas afuera"},"LITTLE CAESARS PIRQUE":{"d1":"SLC","d2":"salidas afuera"},"FOOD GARAGE":{"d1":"SLC","d2":"salidas afuera"},"COMERCIALIZADORA CON":{"d1":"SLC","d2":"minimarket"},"CONFITERIAS PIRQUE":{"d1":"SLC","d2":"minimarket"},"UBER":{"d1":"MPP","d2":"salidas afuera"},"MERCADOPAGO *INGENIOS":{"d1":"SLC","d2":"salidas afuera"},"CINEPOLIS WEB":{"d1":"SLC","d2":"entretencion"},"MERPAGO*LA FABBRICA LA":{"d1":"MPP","d2":"salidas afuera"},"FARM. AHUMADA SPA L732":{"d1":"SLC","d2":"farmacia"},"PLAZA EGANA":{"d1":"MPP","d2":"otros"},"CINEPOLIS LA REINA":{"d1":"SLC","d2":"entretencion"},"CHILEPIZZA PIRQUE SPA":{"d1":"SLC","d2":"salidas afuera"},"GOOGLE *GOOGLE ONE":{"d1":"SLC","d2":"otros"},"QANTAS (BSP V)":{"d1":"SLC","d2":"australia"},"REDGLOBA*DON QUIJOTE S":{"d1":"SLC","d2":"otros"},"J OHINA":{"d1":"SLC","d2":"otros"},"IMPUESTO CUOTAS QANTAS (BSP V)":{"d1":"SLC","d2":"australia"},"HIP LIDER PUENTE ALTO":{"d1":"SLC","d2":"supermercado"},"VIAJES FALABELLA TC":{"d1":"SLC","d2":"salidas afuera"},"VITACURA":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *SKECHERS":{"d1":"SLC","d2":"otros"},"OPENAI *CHATGPT SUBSCR":{"d1":"SLC","d2":"otros"},"BURGER KING H.DE AGUIR":{"d1":"SLC","d2":"salidas afuera"},"HOME AFFAIRS - ONLINE":{"d1":"MPP","d2":"australia"},"MERCADOPAGO *CAMILA":{"d1":"SLC","d2":"minimarket"},"MICROSOFT CL MICROSOFT":{"d1":"SLC","d2":"otros"},"HDI SEGUROS SA":{"d1":"MPP","d2":"seguro"},"RENTA NACIONAL GENE":{"d1":"SLC","d2":"seguro"},"BUEN GUSTO LTDA":{"d1":"SLC","d2":"minimarket"},"SUMUP * COCINA RUSTICA":{"d1":"SLC","d2":"salidas afuera"},"DISNEY PLUS":{"d1":"MPP","d2":"streaming"},"TOMY BOL":{"d1":"SLC","d2":"minimarket"},"ANGELO CIRAULO":{"d1":"SLC","d2":"minimarket"},"JUMBO COSTANERA CENTER":{"d1":"SLC","d2":"salidas afuera"},"UBER *LIME HELP.UBER.C":{"d1":"SLC","d2":"otros"},"SERVICIOS Y COMERCIAL":{"d1":"SLC","d2":"otros"},"PAYU *BIKE SANTIAGO":{"d1":"SLC","d2":"otros"},"GOOGLE PLAY":{"d1":"SLC","d2":"streaming"},"JUMBO PUENTE ALTO":{"d1":"SLC","d2":"supermercado"},"PRAXIS QUIRIROPRACT":{"d1":"SLC","d2":"medico"},"MERCADOPAGO *ALIPAYSI":{"d1":"SLC","d2":"otros"},"NETFLIX.COM":{"d1":"SLC","d2":"streaming"},"PAITA PIRQUE":{"d1":"SLC","d2":"salidas afuera"},"SALUD UC RADIOLOGIA":{"d1":"SLC","d2":"medico"},"DMOOV CORP SPA":{"d1":"MPP","d2":"deporte"},"AHUM L670 VIC ORIEN":{"d1":"MPP","d2":"farmacia"},"SPORT PIRQUE SPA":{"d1":"SLC","d2":"deporte"},"MERCADOPAGO *MULTISER":{"d1":"SLC","d2":"minimarket"},"MERPAGO*FUME CHILE SPA":{"d1":"SLC","d2":"entretencion"},"MC DONALDS":{"d1":"SLC","d2":"salidas afuera"},"APPLE.COM/BILL":{"d1":"MPP","d2":"electronica"},"MERPAGO*ROSASALGADO":{"d1":"SLC","d2":"minimarket"},"MERCADOPAGO *VERDURAS":{"d1":"SLC","d2":"minimarket"},"MERCADOPAGO *PEDRO":{"d1":"SLC","d2":"minimarket"},"MERCADOPAGO *NATALIAO":{"d1":"SLC","d2":"minimarket"},"SERVICIOS TORO SPA":{"d1":"SLC","d2":"salidas afuera"},"CENTRAL PARKING SYSTEM":{"d1":"MPP","d2":"estacionamiento"},"MERCADOPAGO *EUGENIO":{"d1":"SLC","d2":"minimarket"},"MORITZ ISIDORA":{"d1":"SLC","d2":"salidas afuera"},"PARKING MALL FLORIDA C":{"d1":"MPP","d2":"estacionamiento"},"HYM FLORIDA CENTER1":{"d1":"SLC","d2":"otros"},"H&M MALL PLAZA VESPUCI":{"d1":"SLC","d2":"otros"},"HYM COSTANERA CENTE":{"d1":"SLC","d2":"otros"},"LEGO COSTANERA CENT":{"d1":"SLC","d2":"otros"},"LA BIRRA CHILE SPA":{"d1":"SLC","d2":"salidas afuera"},"TUU*BARBERIA NAPOLES":{"d1":"SLC","d2":"barberia"},"KIOSKOS KENTUCKY PTE A":{"d1":"SLC","d2":"salidas afuera"},"TOKU *COLEGIO LOS OL":{"d1":"SLC","d2":"colegio"},"DL*GOOGLE YOUTUBE":{"d1":"SLC","d2":"streaming"},"MERPAGO*LITTLECAESARS":{"d1":"SLC","d2":"salidas afuera"},"MERPAGO*AYMA LIMITADA":{"d1":"SLC","d2":"salidas afuera"},"SOCIEDAD DE ALIMENTO":{"d1":"SLC","d2":"otros"},"RECARGA PAGOYA 1":{"d1":"SLC","d2":"otros"},"REDGLOBA*CAFE CALLEJER":{"d1":"SLC","d2":"salidas afuera"},"WENDYS ENCOMENDEROS":{"d1":"SLC","d2":"salidas afuera"},"PILLIN":{"d1":"SLC","d2":"otros"},"MERCADOPAGO *BNACIONA":{"d1":"SLC","d2":"otros"},"RESTAURANTE ESKENAZO":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *KCINCOSP":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *MAX":{"d1":"SLC","d2":"streaming"},"TUU*BARBERIANAPOLES":{"d1":"SLC","d2":"barberia"},"RESTAURANTE TUBINGER":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *LITTLECA":{"d1":"SLC","d2":"salidas afuera"},"COMERCIAL Y SERVICIOS":{"d1":"SLC","d2":"otros"},"MERCADOPAGO *CASAYQUI":{"d1":"SLC","d2":"salidas afuera"},"PARKING MALL PLAZA":{"d1":"SLC","d2":"estacionamiento"},"PAGO EN MERCADOPAGO 5":{"d1":"SLC","d2":"minimarket"},"MERPAGO*KCINCOSPA":{"d1":"SLC","d2":"minimarket"},"NETFLIX NETFLIX.COM":{"d1":"SLC","d2":"streaming"},"SPORT PIRQUE":{"d1":"SLC","d2":"deporte"},"MERPAGO*XS MARKET K CI":{"d1":"SLC","d2":"salidas afuera"},"FARMACIA EL PRINCIP":{"d1":"SLC","d2":"farmacia"},"MERPAGO*MULTISERVICIO":{"d1":"SLC","d2":"minimarket"},"CREDITO Y COBRANZA MAR":{"d1":"SLC","d2":"medico"},"PLAZA EGANA PISO UNO":{"d1":"MPP","d2":"electronica"},"MERPAGO*SEBASTIANALEJA":{"d1":"SLC","d2":"minimarket"},"TUU*TENCNOELECTRO":{"d1":"SLC","d2":"otros"},"WWW.ALIEXPRESS.COM":{"d1":"SLC","d2":"otros"},"SHEIN CL SHEIN.COM":{"d1":"MPP","d2":"otros"},"TOBALABA ONECLICK":{"d1":"SLC","d2":"otros"},"WEBPAY":{"d1":"SLC","d2":"otros"},"CV 006":{"d1":"SLC","d2":"farmacia"},"SODIMAC HC PUENTE ALTO":{"d1":"SLC","d2":"otros"},"PASTELERIA EVELYN MA":{"d1":"SLC","d2":"salidas afuera"},"RUIZ DURAN SPA":{"d1":"SLC","d2":"minimarket"},"FALABELLA.COM":{"d1":"SLC","d2":"otros"},"IMPUESTO CUOTAS FALABELLA.COM":{"d1":"SLC","d2":"otros"},"NINTENDO OF AMERICA":{"d1":"SLC","d2":"otros"},"EL TALLER - MUT":{"d1":"SLC","d2":"salidas afuera"},"MP *SIMPLEPARK":{"d1":"SLC","d2":"estacionamiento"},"MP *CORIS":{"d1":"SLC","d2":"seguro"},"ESMAX DISTRIBUCION SPA":{"d1":"SLC","d2":"bencina"},"TONNY PIZZERIA MUT":{"d1":"SLC","d2":"salidas afuera"},"LIDER EXP PEDRO FONTOVA":{"d1":"SLC","d2":"salidas afuera"},"PAN Y AZUCAR LTDA":{"d1":"SLC","d2":"salidas afuera"},"COMERCIAL LUCKY LIMI":{"d1":"SLC","d2":"salidas afuera"},"LOA CHILE SPA":{"d1":"SLC","d2":"salidas afuera"},"TICKETMASTER TC 2":{"d1":"SLC","d2":"otros"},"LOS CEREZOS 16":{"d1":"SLC","d2":"salidas afuera"},"SALUD UC UTM COSTAN":{"d1":"SLC","d2":"medico"},"DEVOLUCION WWW.ALIEXPRESS.COM":{"d1":"SLC","d2":"otros"},"JOHNNY ROCKETS EGANA":{"d1":"SLC","d2":"salidas afuera"},"CINE HOYTS PLAZA EGANA":{"d1":"SLC","d2":"entretencion"},"TOTTUS":{"d1":"SLC","d2":"supermercado"},"MERCADOPAGO *LABARRA":{"d1":"SLC","d2":"salidas afuera"},"MARIO CELESTIA":{"d1":"SLC","d2":"minimarket"},"RESTAURANT NAN FANG":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *LUXOTTIC":{"d1":"SLC","d2":"salidas afuera"},"VIDAINTEGRA PILOTO 4 0 LA":{"d1":"SLC","d2":"medico"},"LAIK TITANIUM":{"d1":"SLC","d2":"otros"},"MERCADOPAGO *MERCADOL":{"d1":"SLC","d2":"electronica"},"INTEGRAMEDICA PLAZA CCMM":{"d1":"MPP","d2":"medico"},"EXAMENES DE LABORAT":{"d1":"MPP","d2":"medico"},"14756-BK FLORIDA CENTE":{"d1":"SLC","d2":"salidas afuera"},"25891-BK PEDRO FONTOVA":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *FUENTELA":{"d1":"SLC","d2":"salidas afuera"},"BURGER KING PLAZA EGANA":{"d1":"SLC","d2":"salidas afuera"},"COMERCIAL ZHI LING L":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *AROMACOF":{"d1":"SLC","d2":"salidas afuera"},"ELECTRONICA RETAIL LIM":{"d1":"SLC","d2":"electronica"},"HIP LIDER HUECHURABA":{"d1":"SLC","d2":"supermercado"},"HIP LIDER NOS":{"d1":"SLC","d2":"supermercado"},"JUMBO FLORIDA CENTER":{"d1":"SLC","d2":"supermercado"},"JUMBO SAN BERNARDO":{"d1":"SLC","d2":"supermercado"},"KFC 50 COSTANERA":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *CHICKENC":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *ERICK":{"d1":"SLC","d2":"minimarket"},"MERCADOPAGO *BIP":{"d1":"SLC","d2":"otros"},"MERPAGO*EUGENIO":{"d1":"SLC","d2":"minimarket"},"MERPAGO*NATALIAORTEGA":{"d1":"SLC","d2":"minimarket"},"MOVILAND":{"d1":"SLC","d2":"entretencion"},"SUMUP * LA ESQUINA":{"d1":"SLC","d2":"salidas afuera"},"NATALIA":{"d1":"SLC","d2":"minimarket"},"MERCADOPAGO *DUNKIN":{"d1":"SLC","d2":"salidas afuera"},"PARKING COSTANERA":{"d1":"SLC","d2":"estacionamiento"},"PARKING JUMBO SANBERNA":{"d1":"SLC","d2":"estacionamiento"},"QUICK LUNCH ALEMAN":{"d1":"SLC","d2":"salidas afuera"},"RIPLEY SAN BERNARDO":{"d1":"SLC","d2":"otros"},"SHELL 1CLICK MI COP":{"d1":"SLC","d2":"bencina"},"SODIMAC HC SAN BERNARDO MAL":{"d1":"SLC","d2":"otros"},"SOMOS CHURROS":{"d1":"SLC","d2":"salidas afuera"},"SUMUP * BOTILLERIA EL":{"d1":"SLC","d2":"minimarket"},"IMPUESTO CUOTAS DMOOV CORP SPA":{"d1":"MPP","d2":"deporte"},"TUU*BUEN GUSTO":{"d1":"SLC","d2":"minimarket"},"TUU*MINI MARQUET DULCE":{"d1":"SLC","d2":"minimarket"},"UC UTM ESCUELA MILITAR":{"d1":"SLC","d2":"medico"},"UNIMARC PIRQUE":{"d1":"SLC","d2":"supermercado"},"PAULINA JEREZ":{"d1":"MPP","d2":"otros"},"COMERCIAL HOGAR DE C":{"d1":"MPP","d2":"otros"},"UBER EATS":{"d1":"MPP","d2":"salidas afuera"},"EASYCANCHA":{"d1":"SLC","d2":"deporte"},"29591-BK VESPUCIO AK":{"d1":"SLC","d2":"salidas afuera"},"TUU*PASTELERIA Y REPOS":{"d1":"SLC","d2":"minimarket"},"MUNIPIRQUE M.EL PRINCI":{"d1":"SLC","d2":"permiso de circulacion"},"ARCOS DORADOS RESTAURA":{"d1":"SLC","d2":"salidas afuera"},"INV LOS LEONES CUD1":{"d1":"SLC","d2":"estacionamiento"},"SUMUP * EMPORIO LA RO":{"d1":"SLC","d2":"salidas afuera"},"OKM CARMEN SYLVA":{"d1":"SLC","d2":"minimarket"},"ANTIGUA FUENTE":{"d1":"SLC","d2":"salidas afuera"},"SCOTIABANK HIPOTECARIO":{"d1":"SLC","d2":"credito"},"31024-BK HERNANDO AG":{"d1":"SLC","d2":"salidas afuera"},"YA GANA*EL REY DE LAS":{"d1":"SLC","d2":"salidas afuera"},"LBB COSTANERA SPA":{"d1":"SLC","d2":"salidas afuera"},"MARIA JOSE GONZALEZ":{"d1":"SLC","d2":"minimarket"},"CARNES FUTRONO":{"d1":"SLC","d2":"minimarket"},"SUMUP * NATALIA DE LO":{"d1":"SLC","d2":"minimarket"},"SUMUP * MAURICIO ANDR":{"d1":"SLC","d2":"minimarket"},"JUMBO PORTAL LA REINA":{"d1":"SLC","d2":"supermercado"},"GELATOS PORTAL LA REINA":{"d1":"SLC","d2":"salidas afuera"},"LA FABBRICA SPA":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *MIDULCEI":{"d1":"SLC","d2":"minimarket"},"COMCAL PIRQUE":{"d1":"SLC","d2":"minimarket"},"HEINEMANN DUTY FREE":{"d1":"MPP","d2":"australia"},"PIER B PHARMACY":{"d1":"MPP","d2":"australia"},"MCDONALDS QUEEN ST":{"d1":"MPP","d2":"australia"},"VALLEY GIRL":{"d1":"MPP","d2":"australia"},"COLES 4508":{"d1":"MPP","d2":"australia"},"LIBERTY CIA SEGURO":{"d1":"SLC","d2":"seguro"},"SOUTHBANK BEER GARDEN":{"d1":"MPP","d2":"australia"},"ZLR*NEW FARM PARK KIOS":{"d1":"MPP","d2":"australia"},"THE SUMMIT BRISBANE":{"d1":"MPP","d2":"australia"},"SQ *KREAMED":{"d1":"MPP","d2":"australia"},"SQ *UPBEAT CAFE":{"d1":"MPP","d2":"australia"},"REDGLOBA*COMPUTECNICA":{"d1":"SLC","d2":"electronica"},"SOUTHBANK BEACH NEWS A":{"d1":"MPP","d2":"australia"},"CITY HALL DUTY FREE":{"d1":"MPP","d2":"australia"},"BEN AND JERRYS SOUTHBA":{"d1":"MPP","d2":"australia"},"MP *HOUSEPRICING":{"d1":"SLC","d2":"otros"},"FUENTE ALEMANA":{"d1":"SLC","d2":"salidas afuera"},"THAI ON TIME":{"d1":"MPP","d2":"australia"},"MCDONALDS TRAVESTONS":{"d1":"MPP","d2":"australia"},"ALDI STORES":{"d1":"MPP","d2":"australia"},"MERCADOPAGO *SMARTTEC":{"d1":"SLC","d2":"electronica"},"HANARO INDOOROOPILLY P":{"d1":"MPP","d2":"australia"},"REBEL INDOOROOPILLY":{"d1":"MPP","d2":"australia"},"SMP*THE GARDEN MILL C":{"d1":"MPP","d2":"australia"},"SB 771":{"d1":"SLC","d2":"farmacia"},"GIDJI CAFE B0059":{"d1":"MPP","d2":"australia"},"DE LA OSTIA PROVIDENCIA":{"d1":"SLC","d2":"salidas afuera"},"KIOSKOS WENDYS WD38-P.":{"d1":"SLC","d2":"salidas afuera"},"BEER GARDEN BELLAVIS":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *BOTLOSDO":{"d1":"SLC","d2":"minimarket"},"CINEHOYTS ESPACIO URBA":{"d1":"SLC","d2":"entretencion"},"C AND B PHARMACY PTY":{"d1":"MPP","d2":"australia"},"PARADISE RESORT":{"d1":"MPP","d2":"australia"},"QUACKER SAFARIS PTY L":{"d1":"MPP","d2":"australia"},"UBER *TRIP HELP.UBER.C":{"d1":"MPP","d2":"australia"},"ARCADE TRADER":{"d1":"MPP","d2":"australia"},"SEA WORLD QLD":{"d1":"MPP","d2":"australia"},"WARNER BROS MOVIE WO":{"d1":"MPP","d2":"australia"},"FUENTE DE SODA SUIZA UNO":{"d1":"SLC","d2":"salidas afuera"},"WET - N - WILD":{"d1":"MPP","d2":"australia"},"CHEMIST WAREHOUSE TOOW":{"d1":"MPP","d2":"australia"},"MP *MAX":{"d1":"SLC","d2":"streaming"},"SB 720":{"d1":"SLC","d2":"farmacia"},"INTEGRAMEDICA AUTOS":{"d1":"SLC","d2":"medico"},"ONE CLICK ALTO LAS CON":{"d1":"SLC","d2":"estacionamiento"},"INTEGRAMEDICA AUTOS AL":{"d1":"SLC","d2":"medico"},"23765-BK SUECIA":{"d1":"SLC","d2":"salidas afuera"},"NETFLIX":{"d1":"SLC","d2":"streaming"},"AUSTRALIA ZOO":{"d1":"MPP","d2":"australia"},"AUSTRALIA ZOO OPERAT":{"d1":"MPP","d2":"australia"},"18689-BK COSTANERA":{"d1":"SLC","d2":"salidas afuera"},"AOP ENTERPRISES PL":{"d1":"MPP","d2":"australia"},"MERCADOPAGO *EUGENIO*":{"d1":"SLC","d2":"minimarket"},"SCOTIABANK HIPOTECARIO*":{"d1":"BULL","d2":"credito"},"INV LOS LEONES CUD*":{"d1":"SLC","d2":"estacionamiento"},"VIRTUAL*RENTA NACIONAL*":{"d1":"SLC","d2":"seguro"},"DA DINO SUB CENTRO*":{"d1":"SLC","d2":"salidas afuera"},"AMERICANINO EGANA*":{"d1":"SLC","d2":"otros"},"CENTROMEDICO CSM LA RE*":{"d1":"MPP","d2":"medico"},"SERVICIOS Y COMERCIAL*":{"d1":"SLC","d2":"salidas afuera"},"SUMUP * BRAULIO VASQU":{"d1":"SLC","d2":"minimarket"},"COMERCIAL JAVI SPA":{"d1":"SLC","d2":"minimarket"},"TUU*COTITO FRUIT":{"d1":"SLC","d2":"minimarket"},"CLAUDE.AI SUBSCRIPTION":{"d1":"SLC","d2":"electronica"},"MICROSOFT CL STORE":{"d1":"SLC","d2":"entretencion"},"SUMUP * COCINA RUSTIC":{"d1":"SLC","d2":"salidas afuera"},"SUMUP * VERDURAS LEAL":{"d1":"SLC","d2":"minimarket"},"SUMUP * ACEITUNAS B F":{"d1":"SLC","d2":"minimarket"},"PUNTO MARKET":{"d1":"SLC","d2":"minimarket"},"JOHNNY ROCKETS COSTA":{"d1":"SLC","d2":"salidas afuera"},"MP *WHOOSHCLSPA":{"d1":"SLC","d2":"otros"},"EURO HOTEL LTDA":{"d1":"SLC","d2":"entretencion"},"PRONTO COLINA":{"d1":"SLC","d2":"minimarket"},"MERCADOPAGO *MISAELMO":{"d1":"SLC","d2":"minimarket"},"DULCE LUNA EGANA":{"d1":"MPP","d2":"salidas afuera"},"LA PIZZARRA":{"d1":"MPP","d2":"salidas afuera"},"MONARCH":{"d1":"SLC","d2":"otros"},"40523-SBX CALLAO":{"d1":"SLC","d2":"minimarket"},"INV LOS LEONES CUD":{"d1":"SLC","d2":"estacionamiento"},"PLANES DE SALUD UC CHR":{"d1":"SLC","d2":"seguro"},"KARTING PIRQUE":{"d1":"MPP","d2":"entretencion"},"WEBPAY EPARIS":{"d1":"MPP","d2":"entretencion"},"DUANDY LA REINA":{"d1":"SLC","d2":"otros"},"EGANA":{"d1":"SLC","d2":"salidas afuera"},"HAPPYLAND LA REINA":{"d1":"SLC","d2":"entretencion"},"PC FACTORY PLAZA EGANA":{"d1":"SLC","d2":"electronica"},"MALLPLAZA EGANA":{"d1":"SLC","d2":"otros"},"EGANA 2":{"d1":"SLC","d2":"electronica"},"EL CARMEN LTDA":{"d1":"SLC","d2":"minimarket"},"CORPORACION SAN RAF":{"d1":"MPP","d2":"colegio"},"MUNI DE PIRQUE":{"d1":"MPP","d2":"otros"},"APPLE.COM BILL":{"d1":"MPP","d2":"electronica"},"NFS PUENTE ALTO":{"d1":"SLC","d2":"entretencion"},"COMERCIAL OLAVARRIA":{"d1":"SLC","d2":"minimarket"},"KIDZANIA SANTIAGO":{"d1":"SLC","d2":"otros"},"COMERCIAL DE REPUEST":{"d1":"SLC","d2":"minimarket"},"MALLPLAZA TOBALABA":{"d1":"SLC","d2":"otros"},"MERCADO TOBALABA":{"d1":"SLC","d2":"otros"},"MERCADOPAGO *DAIZUSUS":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *BUILDER":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *FTEMARDO":{"d1":"SLC","d2":"salidas afuera"},"PEDRO FONTOVA":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *CONFDEPI":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *COMPRAPR":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *VILOR":{"d1":"SLC","d2":"salidas afuera"},"MERCADOPAGO *ALIMENTA":{"d1":"SLC","d2":"salidas afuera"},"UNDER PUENTE ALTO":{"d1":"SLC","d2":"entretencion"},"VIRTUAL*RENTA NACIONAL":{"d1":"SLC","d2":"seguro"},"DA DINO SUB CENTRO":{"d1":"SLC","d2":"salidas afuera"},"AMERICANINO PLAZA EGA?A":{"d1":"SLC","d2":"otros"}};
+const VALID_D2=['entretencion','medico','otros','deporte','barberia','farmacia','streaming','estacionamiento','electronica','minimarket','seguro','bencina','permiso de circulacion','supermercado','australia','salidas afuera','colegio','credito'];
+const COLORS={entretencion:'#a78bfa',medico:'#fb923c',otros:'#6b7280',deporte:'#4ade80',barberia:'#fbbf24',farmacia:'#f87171',streaming:'#818cf8',estacionamiento:'#9ca3af',electronica:'#60a5fa',minimarket:'#34d399',seguro:'#e879f9',bencina:'#facc15',supermercado:'#86efac','salidas afuera':'#fcd34d',australia:'#c084fc',colegio:'#67e8f9',credito:'#fca5a5','permiso de circulacion':'#d1d5db'};
+let LOOKUP={...BASE}, rows=[], currentPeriod='';
+
+async function loadRules(){
+  const el=document.getElementById('gsPill');
+  try{
+    const r=await fetch(GS+'?action=getRules');
+    const d=await r.json();
+    if(d.ok){
+      const n=Object.keys(d.rules||{}).length;
+      if(n>0){LOOKUP={...BASE,...d.rules};el.textContent=`✓ ${Object.keys(LOOKUP).length} reglas`;el.className='gs-pill ok';}
+      else{await saveRules(BASE);el.textContent=`✓ ${Object.keys(LOOKUP).length} reglas inicializadas`;el.className='gs-pill ok';}
+    }
+  }catch(e){el.textContent='sin conexión a Sheets';el.className='gs-pill';}
+}
+
+async function saveRules(rules){
+  try{await fetch(GS,{method:'POST',body:JSON.stringify({action:'saveRules',rules}),headers:{'Content-Type':'application/json'}});}
+  catch(e){console.warn('Sheets no disponible',e);}
+}
+
+function norm(raw){return raw.toUpperCase().replace(/^COMPRA EN CUOTAS /,'').replace(/^COMPRA /,'').replace(/^IMPUESTO COMPRA CUOTAS /,'').replace(/\*+$/,'').trim();}
+
+function match(n){
+  if(LOOKUP[n])return{...LOOKUP[n],src:'historial'};
+  const ws=n.split(/\s+/).filter(w=>w.length>3);
+  let best=null,bs=0;
+  for(const[k,v]of Object.entries(LOOKUP)){const s=ws.reduce((a,w)=>a+(k.includes(w)?w.length:0),0);if(s>bs&&s>=5){bs=s;best=v;}}
+  return best?{...best,src:'fuzzy'}:null;
+}
+
+function excelDate(v){
+  if(typeof v==='number'){const d=new Date(Math.round((v-25569)*86400*1000));return d.toISOString().slice(0,10);}
+  return String(v||'').slice(0,10);
+}
+
+function fmt(v){return '$'+Math.round(Math.abs(v)).toLocaleString('es-CL');}
+
+function handleFile(e){
+  const file=e.target.files[0]; if(!file)return;
+  const m=file.name.match(/(\d{2})(\d{2})-?(\d{2})(\d{2})/);
+  currentPeriod=m?`20${m[2]}-${m[1]}/20${m[4]}-${m[3]}`:file.name.replace(/\.(xlsx|xls|csv)$/i,'');
+  document.getElementById('uploadTitle').textContent=file.name;
+  document.getElementById('uploadSub').textContent=(file.size/1024).toFixed(0)+' KB · procesando...';
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const wb=XLSX.read(ev.target.result,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(!data||data.length<2)return;
+    const hdr=data[0].map(h=>String(h).trim());
+    const fc=(...p)=>hdr.findIndex(h=>p.some(x=>new RegExp(x,'i').test(h)));
+    const iD=fc('descripci'),iV=fc('valor cuota','valor_cuota'),iF=fc('fecha'),iT=fc('titular');
+    const iD1=fc('descripcion 1','descripci.n 1','campo1','desripcion1','categoria1');
+    const iD2=fc('descripcion 2','descripci.n 2','campo 2','descripcion2','categoria2');
+    rows=[];
+    for(const row of data.slice(1)){
+      const desc=iD>=0?String(row[iD]||'').trim():'';
+      const monto=iV>=0?parseFloat(String(row[iV]||0).replace(/[^0-9.\-]/g,''))||0:0;
+      const fecha=iF>=0?excelDate(row[iF]):'';
+      const tit=iT>=0?String(row[iT]||'').trim():'';
+      if(!desc||desc==='nan'||desc==='DESCRIPCION'||desc.toUpperCase().includes('PAGO TARJETA'))continue;
+      if(monto===0)continue;
+      const ed1=iD1>=0?String(row[iD1]||'').trim().toUpperCase():'';
+      const ed2=iD2>=0?String(row[iD2]||'').trim().toLowerCase():'';
+      const hd1=['SLC','MPP','BULL'].includes(ed1);
+      const hd2=ed2&&ed2!=='¿?'&&VALID_D2.includes(ed2);
+      let d1,d2,src;
+      if(hd1&&hd2){d1=ed1;d2=ed2;src='historial';}
+      else{const m=match(norm(desc));d1=hd1?ed1:(m?m.d1:'?');d2=hd2?ed2:(m?m.d2:'');src=m?m.src:'desconocido';}
+      rows.push({fecha,desc,monto,titular:tit,d1,d2,src,isCredit:monto<0});
+    }
+    document.getElementById('uploadSub').textContent=file.name+' · '+rows.length+' filas';
+    render();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const zone=document.getElementById('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragging');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('dragging'));
+zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragging');const f=e.dataTransfer.files[0];if(f){document.getElementById('fileInput').files=e.dataTransfer.files;handleFile({target:{files:[f]}});}});
+
+function showTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>{const ns=['pivot','cats','unknowns','detail'];t.classList.toggle('active',ns[i]===name);});
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function updateRow(desc,monto,field,value){const r=rows.find(x=>x.desc===desc&&x.monto===monto);if(r)r[field]=value;}
+
+function render(){
+  document.getElementById('results').classList.remove('hidden');
+  const spend=rows.filter(r=>!r.isCredit);
+  const total=spend.reduce((s,r)=>s+r.monto,0);
+  const resolved=spend.filter(r=>r.src!=='desconocido').length;
+  const unk=spend.filter(r=>r.src==='desconocido');
+  const pct=spend.length?Math.round(resolved/spend.length*100):0;
+  document.getElementById('mTotal').textContent=fmt(total);
+  document.getElementById('mCount').textContent=spend.length;
+  document.getElementById('mAuto').textContent=resolved;
+  document.getElementById('mUnk').textContent=unk.length;
+  document.getElementById('pctLabel').textContent=pct+'%';
+  document.getElementById('progressFill').style.width=pct+'%';
+  document.getElementById('tableCount').textContent=spend.length+' movimientos';
+  document.getElementById('btnTg').disabled=false;
+
+  // PIVOT
+  const d1s=[...new Set(spend.map(r=>r.d1).filter(d=>d&&d!=='?'))].sort();
+  const bcd={};
+  spend.forEach(r=>{const c=r.d2||'sin cat',d=r.d1||'?';if(!bcd[c])bcd[c]={};bcd[c][d]=(bcd[c][d]||0)+r.monto;});
+  const sc=Object.entries(bcd).sort((a,b)=>Object.values(b[1]).reduce((s,v)=>s+v,0)-Object.values(a[1]).reduce((s,v)=>s+v,0));
+  let ph='<thead><tr><th>Categoría</th>'+d1s.map(d=>`<th>${d}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
+  sc.forEach(([cat,bd])=>{
+    const rt=Object.values(bd).reduce((s,v)=>s+v,0);
+    ph+=`<tr><td><span class="cat-dot" style="background:${COLORS[cat]||'#555'};"></span>${cat}</td>`+d1s.map(d=>`<td>${bd[d]?fmt(bd[d]):'—'}</td>`).join('')+`<td>${fmt(rt)}</td></tr>`;
+  });
+  ph+='<tr><td>Total general</td>'+d1s.map(d=>`<td>${fmt(spend.filter(r=>r.d1===d).reduce((a,r)=>a+r.monto,0))}</td>`).join('')+`<td>${fmt(total)}</td></tr></tbody>`;
+  document.getElementById('pivotTable').innerHTML=ph;
+
+  // BARS
+  const bc={},bd1={};
+  spend.forEach(r=>{const c=r.d2||'sin cat';bc[c]=(bc[c]||0)+r.monto;const d=r.d1||'?';bd1[d]=(bd1[d]||0)+r.monto;});
+  const scat=Object.entries(bc).sort((a,b)=>b[1]-a[1]),maxC=scat[0]?.[1]||1;
+  document.getElementById('catBreakdown').innerHTML=scat.map(([c,v])=>`<div class="cat-row"><span class="cat-name">${c}</span><div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(v/maxC*100)}%;background:${COLORS[c]||'#555'};"></div></div><span class="cat-val">${fmt(v)}</span><span class="cat-pct">${Math.round(v/total*100)}%</span></div>`).join('');
+  const sd1=Object.entries(bd1).sort((a,b)=>b[1]-a[1]),maxD=sd1[0]?.[1]||1;
+  document.getElementById('d1Breakdown').innerHTML=sd1.map(([d,v])=>`<div class="cat-row"><span class="cat-name" style="font-weight:500;color:var(--text);">${d}</span><div class="cat-bar-wrap"><div class="cat-bar" style="width:${Math.round(v/maxD*100)}%;background:var(--accent);"></div></div><span class="cat-val">${fmt(v)}</span><span class="cat-pct">${Math.round(v/total*100)}%</span></div>`).join('');
+
+  // UNKNOWNS
+  document.getElementById('unkTitle').textContent=`Sin categoría — ${unk.length} pendientes`;
+  document.getElementById('unkList').innerHTML=unk.length===0?'<p style="color:var(--green);font-size:13px;padding:0.5rem 0;">✓ Todo categorizado</p>':unk.map(r=>{
+    const sd=r.desc.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return`<div class="unk-row"><span class="unk-fecha">${r.fecha}</span><span class="unk-desc">${r.desc.replace(/^COMPRA (EN CUOTAS )?/,'')}</span><span class="unk-titular">${r.titular}</span><span class="unk-monto">${fmt(r.monto)}</span><select class="sel" onchange="updateRow('${sd}',${r.monto},'d1',this.value)" style="width:68px;"><option value="">D1</option>${['SLC','MPP','BULL'].map(v=>`<option value="${v}" ${r.d1===v?'selected':''}>${v}</option>`).join('')}</select><select class="sel" onchange="updateRow('${sd}',${r.monto},'d2',this.value);updateRow('${sd}',${r.monto},'src','manual');" style="width:130px;"><option value="">— categoría —</option>${VALID_D2.map(v=>`<option value="${v}" ${r.d2===v?'selected':''}>${v}</option>`).join('')}</select></div>`;
+  }).join('');
+
+  // TABLE
+  document.getElementById('rowsBody').innerHTML=spend.map(r=>{
+    const b=r.src==='historial'?'<span class="badge badge-hist">hist</span>':r.src==='fuzzy'?'<span class="badge badge-auto">auto</span>':'<span class="badge badge-unk">?</span>';
+    return`<tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">${r.fecha}</td><td class="desc-cell">${r.desc.replace(/^COMPRA (EN CUOTAS )?/,'')}</td><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);">${r.titular}</td><td style="font-family:'DM Mono',monospace;font-size:12px;">${r.d1}</td><td style="font-size:12px;"><span style="color:${COLORS[r.d2]||'var(--text3)'};">●</span> ${r.d2||'—'}</td><td class="monto-cell">${fmt(r.monto)}</td><td>${b}</td></tr>`;
+  }).join('');
+}
+
+async function finalizePeriod(){
+  const box=document.getElementById('sendStatus');
+  box.classList.remove('hidden');box.className='status info';box.textContent='Finalizando...';
+  // 1. collect new rules
+  const newRules={};
+  rows.filter(r=>r.d1&&r.d1!=='?'&&r.d2&&!r.isCredit).forEach(r=>{newRules[norm(r.desc)]={d1:r.d1,d2:r.d2};});
+  // 2. save rules
+  await saveRules(newRules);
+  LOOKUP={...LOOKUP,...newRules};
+  document.getElementById('gsPill').textContent=`✓ ${Object.keys(LOOKUP).length} reglas`;
+  document.getElementById('gsPill').className='gs-pill ok';
+  // 3. save history
+  const spend=rows.filter(r=>!r.isCredit);
+  try{
+    await fetch(GS,{method:'POST',body:JSON.stringify({action:'saveHistory',rows:spend.map(r=>({fecha:r.fecha,desc:r.desc,titular:r.titular,d1:r.d1,d2:r.d2,monto:r.monto,periodo:currentPeriod}))}),headers:{'Content-Type':'application/json'}});
+  }catch(e){console.warn('Historial no guardado',e);}
+  // 4. export excel
+  exportExcel();
+  box.className='status ok';
+  box.textContent=`✓ Listo · ${Object.keys(newRules).length} reglas nuevas · Excel descargado`;
+}
+
+function exportExcel(){
+  const spend=rows.filter(r=>!r.isCredit);
+  const ws=XLSX.utils.aoa_to_sheet([
+    ['FECHA','DESCRIPCION','TITULAR/ADICIONAL','MONTO','CUOTAS PENDIENTES','VALOR CUOTA','DESCRIPCION 1','DESCRIPCION 2'],
+    ...spend.map(r=>[r.fecha,r.desc,r.titular,r.monto,0,r.monto,r.d1,r.d2])
+  ]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Movimientos Facturados');
+  XLSX.writeFile(wb,`gastos_${currentPeriod.replace(/\//g,'-')}_procesado.xlsx`);
+}
+
+async function testTg(){
+  const token=document.getElementById('tgToken').value.trim();
+  const chatId=document.getElementById('tgChatId').value.trim();
+  const box=document.getElementById('tgStatus');
+  box.className='status info';box.classList.remove('hidden');box.textContent='Probando...';
+  if(!token||!chatId){box.className='status err';box.textContent='Ingresa token y chat ID';return;}
+  try{const r=await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:'✅ Conectado!'})});const d=await r.json();box.className=d.ok?'status ok':'status err';box.textContent=d.ok?'✓ Conectado':'Error: '+d.description;}
+  catch(e){box.className='status err';box.textContent='Error de red';}
+}
+
+async function tgSend(token,chatId,text){
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text,parse_mode:'Markdown'})});
+  await new Promise(r=>setTimeout(r,350));
+}
+
+async function sendAllTelegram(){
+  const token=document.getElementById('tgToken').value.trim();
+  const chatId=document.getElementById('tgChatId').value.trim();
+  const box=document.getElementById('sendStatus');
+  box.classList.remove('hidden');box.className='status info';box.textContent='Enviando...';
+  if(!token||!chatId){box.className='status err';box.textContent='Configura el bot primero';return;}
+  const spend=rows.filter(r=>!r.isCredit);
+  const total=spend.reduce((s,r)=>s+r.monto,0);
+  const bc={};spend.forEach(r=>{const c=r.d2||'sin cat';bc[c]=(bc[c]||0)+r.monto;});
+  const sorted=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
+  let msg=`📊 *Gastos ${currentPeriod}*\nTotal: *${fmt(total)}* · ${spend.length} mov\n\n\`\`\`\n`;
+  sorted.forEach(([c,v])=>{msg+=`${c.padEnd(20)} ${fmt(v).padStart(12)}  ${Math.round(v/total*100)}%\n`;});
+  msg+='```';
+  await tgSend(token,chatId,msg);
+  const chunks=[];for(let i=0;i<spend.length;i+=25)chunks.push(spend.slice(i,i+25));
+  for(let ci=0;ci<chunks.length;ci++){
+    let dm=`📋 *Detalle ${ci+1}/${chunks.length}*\n\`\`\`\n`;
+    chunks[ci].forEach(r=>{dm+=`${r.fecha.slice(5)}  ${r.desc.replace(/^COMPRA (EN CUOTAS )?/,'').slice(0,20).padEnd(20)}  ${(r.d1||'?').padEnd(4)}  ${fmt(r.monto).padStart(10)}\n`;});
+    dm+='```';
+    await tgSend(token,chatId,dm);
+  }
+  box.className='status ok';box.textContent=`✓ Enviado — ${chunks.length+1} mensajes`;
+}
+
+loadRules();
+</script>
+</body>
+</html>
