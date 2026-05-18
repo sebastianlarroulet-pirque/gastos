@@ -488,6 +488,9 @@ function loadFile(file){
       const newCount=rows.filter(r=>!r.isCredit&&(!r.d2||!r.d1)).length;
       document.getElementById('uploadSub').textContent=file.name+' · '+rows.filter(r=>!r.isCredit).length+' mov · '+newCount+' nuevos';
       initAb();renderAll();
+      // Save immediately so next reload restores this period
+      if(saveTimer)clearTimeout(saveTimer);
+      postGS({action:'saveActivePeriod',periodo:period,rows:rows});
     }catch(err){document.getElementById('uploadSub').textContent='Error: '+err.message;}
   };
   reader.readAsArrayBuffer(file);
