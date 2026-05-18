@@ -185,6 +185,17 @@ tr:hover td{background:var(--orlight);}
 .empty-ico{font-size:2rem;opacity:.25;margin-bottom:.5rem;}
 
 .hidden{display:none;}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:.875rem 1.25rem;background:var(--s2);border-bottom:1px solid var(--b);}
+.filter-input{background:var(--s);border:1.5px solid var(--b2);color:var(--t);padding:6px 10px;border-radius:8px;font-size:12px;font-family:'Archivo',sans-serif;font-weight:500;outline:none;transition:border .15s;}
+.filter-input:focus{border-color:var(--or);}
+.filter-select{background:var(--s);border:1.5px solid var(--b2);color:var(--t);padding:6px 10px;border-radius:8px;font-size:12px;font-family:'Archivo',sans-serif;font-weight:500;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;}
+.filter-select:focus{border-color:var(--or);}
+.filter-label{font-size:11px;color:var(--t3);font-weight:600;white-space:nowrap;}
+.sort-th{cursor:pointer;user-select:none;}
+.sort-th:hover{color:var(--or);}
+.sort-arrow{font-size:10px;margin-left:3px;color:var(--or);}
+.filter-clear{font-size:11px;color:var(--t3);cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid var(--b2);background:transparent;font-family:'Archivo',sans-serif;font-weight:500;}
+.filter-clear:hover{color:var(--or);border-color:var(--or);}
 
 /* RESPONSIVE */
 @media(max-width:540px){
@@ -258,15 +269,46 @@ tr:hover td{background:var(--orlight);}
     <!-- DETALLE -->
     <div id="tab-detalle" class="tab-content">
       <div class="tbl-wrap">
+        <div class="filter-bar">
+          <span class="filter-label">Filtrar:</span>
+          <input class="filter-input" id="fDesc" placeholder="Descripción..." style="width:160px" oninput="applyFilters()">
+          <select class="filter-select" id="fTit" onchange="applyFilters()">
+            <option value="">Titular/Adicional</option>
+            <option value="Titular">Titular</option>
+            <option value="Adicional">Adicional</option>
+          </select>
+          <select class="filter-select" id="fD1" onchange="applyFilters()">
+            <option value="">DESC1</option>
+            <option value="SLC">SLC</option>
+            <option value="MPP">MPP</option>
+            <option value="BULL">BULL</option>
+          </select>
+          <select class="filter-select" id="fCat" onchange="applyFilters()">
+            <option value="">Categoría</option>
+          </select>
+          <select class="filter-select" id="fSrc" onchange="applyFilters()">
+            <option value="">Fuente</option>
+            <option value="historial">historial</option>
+            <option value="auto">auto</option>
+            <option value="manual">manual</option>
+          </select>
+          <input class="filter-input" id="fFechaDesde" type="date" title="Desde" onchange="applyFilters()" style="width:130px">
+          <input class="filter-input" id="fFechaHasta" type="date" title="Hasta" onchange="applyFilters()" style="width:130px">
+          <button class="filter-clear" onclick="clearFilters()">✕ Limpiar</button>
+          <span id="filterCount" style="font-size:11px;color:var(--t3);font-weight:600;margin-left:auto;"></span>
+        </div>
         <div class="tbl-hdr"><span id="detalleTitle">Todos los movimientos</span><span id="tableCount"></span></div>
         <div class="tbl-scroll">
           <table>
             <thead><tr>
-              <th>Fecha</th><th>Descripción</th>
+              <th class="sort-th" onclick="sortBy('fecha')">Fecha <span class="sort-arrow" id="sort-fecha"></span></th>
+              <th>Descripción</th>
               <th class="hm">Titular</th>
-              <th>DESC1</th><th>Categoría</th>
-              <th style="text-align:right">Valor</th>
-              <th class="hm">Fuente</th><th></th>
+              <th class="sort-th" onclick="sortBy('d1')">DESC1 <span class="sort-arrow" id="sort-d1"></span></th>
+              <th class="sort-th" onclick="sortBy('d2')">Categoría <span class="sort-arrow" id="sort-d2"></span></th>
+              <th class="sort-th" onclick="sortBy('monto')" style="text-align:right">Valor <span class="sort-arrow" id="sort-monto"></span></th>
+              <th class="sort-th hm" onclick="sortBy('src')">Fuente <span class="sort-arrow" id="sort-src"></span></th>
+              <th></th>
             </tr></thead>
             <tbody id="detalleBody"></tbody>
           </table>
@@ -334,16 +376,27 @@ let charts={trend:null,slc:null,mpp:null};
 async function loadRules(){
   const pill=document.getElementById('gsPill');
   try{
-    const r=await fetch(GS+'?action=getRules');
-    const d=await r.json();
-    if(d.ok&&d.rules&&Object.keys(d.rules).length>0){
-      RULES=Object.assign({},BR,d.rules);
-      pill.textContent=Object.keys(RULES).length+' reglas';
-      pill.className='gs-pill ok';
+    // Load rules and active period in parallel
+    const [rRules, rActive] = await Promise.all([
+      fetch(GS+'?action=getRules').then(r=>r.json()),
+      fetch(GS+'?action=getActivePeriod').then(r=>r.json())
+    ]);
+    // Apply rules
+    if(rRules.ok&&rRules.rules&&Object.keys(rRules.rules).length>0){
+      RULES=Object.assign({},BR,rRules.rules);
     }else{
       postGS({action:'saveRules',rules:BR});
-      pill.textContent=Object.keys(RULES).length+' reglas';
-      pill.className='gs-pill ok';
+    }
+    pill.textContent=Object.keys(RULES).length+' reglas';
+    pill.className='gs-pill ok';
+    // Restore active period if exists
+    if(rActive.ok&&rActive.periodo&&rActive.rows&&rActive.rows.length>0){
+      rows=rActive.rows;
+      period=rActive.periodo;
+      document.getElementById('periodLabel').textContent=period;
+      document.getElementById('uploadTitle').textContent='Período activo: '+period;
+      document.getElementById('uploadSub').textContent=rows.filter(r=>!r.isCredit).length+' mov · sube un Excel nuevo para actualizar';
+      initAb();renderAll();
     }
   }catch(e){pill.textContent='local';pill.className='gs-pill';}
 }
@@ -398,6 +451,8 @@ function loadFile(file){
       const iD1=fc('DESCRIPCION 1','DESCRIPCION1','CAMPO1','CATEGORIA1');
       const iD2=fc('DESCRIPCION 2','DESCRIPCION2','CAMPO 2','CATEGORIA2');
       if(iD<0||iV<0){document.getElementById('uploadSub').textContent='No se encontraron columnas. Cols: '+hdr.join(', ');return;}
+      // Load existing active period from Sheets to preserve categorizations
+      const existingRows=rows.slice(); // current rows (may be from restored period)
       rows=[];
       for(let i=hi+1;i<raw.length;i++){
         const row=raw[i];
@@ -415,7 +470,23 @@ function loadFile(file){
         else{const f=findRule(nrm(desc));d1=hd1?ed1:(f?f.d1:'');d2=hd2?ed2:(f?f.d2:'');src=f?f.src:'pendiente';}
         rows.push({fecha,desc,monto,titular:tit,d1,d2,src,isCredit});
       }
-      document.getElementById('uploadSub').textContent=file.name+' · '+rows.filter(r=>!r.isCredit).length+' mov';
+      // Merge: if a row already exists in Sheets with a category, keep it
+      if(existingRows.length>0){
+        rows=rows.map(r=>{
+          // Match by normalized desc + monto + fecha
+          const existing=existingRows.find(e=>
+            nrm(e.desc)===nrm(r.desc) &&
+            Math.abs(Number(e.monto)-Number(r.monto))<1 &&
+            String(e.fecha).slice(0,10)===String(r.fecha).slice(0,10)
+          );
+          if(existing&&existing.d1&&existing.d2){
+            return{...r,d1:existing.d1,d2:existing.d2,src:existing.src||'historial'};
+          }
+          return r;
+        });
+      }
+      const newCount=rows.filter(r=>!r.isCredit&&(!r.d2||!r.d1)).length;
+      document.getElementById('uploadSub').textContent=file.name+' · '+rows.filter(r=>!r.isCredit).length+' mov · '+newCount+' nuevos';
       initAb();renderAll();
     }catch(err){document.getElementById('uploadSub').textContent='Error: '+err.message;}
   };
@@ -441,6 +512,7 @@ function undoAb(i){const ab=abonos[i];if(ab.rejected){const r=rows[ab.ci];r.isCr
 function renderAll(){
   document.getElementById('results').classList.remove('hidden');
   updateM();renderPend();renderDetalle();renderAb();renderRes();renderTrend();
+  saveActivePeriod();
 }
 
 function updateM(){
@@ -480,6 +552,11 @@ function renderDetalle(){
   const sp=rows.filter(r=>!r.isCredit&&r.monto>0);
   document.getElementById('tableCount').textContent=sp.length+' mov';
   document.getElementById('detalleTitle').textContent='Todos los movimientos ('+sp.length+')';
+  populateCatFilter();
+  applyFilters();
+}
+
+function renderDetalleRows(sp){
   const d1opts=VD1.map(v=>'<option value="'+v+'">'+v+'</option>').join('');
   const d2opts=VD2.map(v=>'<option value="'+v+'">'+v+'</option>').join('');
   document.getElementById('detalleBody').innerHTML=sp.map(r=>{
@@ -622,11 +699,24 @@ function setF(i,f,v){
   if(isDone(rows[i])){
     if(rows[i].src==='pendiente')rows[i].src='manual';
     setTimeout(()=>{
-      updateM();renderPend();renderDetalle();renderRes();renderTrend();
-      // Auto-switch to detalle tab
+      updateM();renderPend();populateCatFilter();applyFilters();renderRes();renderTrend();
       showTab('detalle');
+      saveActivePeriod(); // auto-save on every categorization
     },100);
   }
+}
+
+// Save current period state to Sheets (debounced)
+let saveTimer=null;
+function saveActivePeriod(){
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    if(!period||!rows.length)return;
+    postGS({action:'saveActivePeriod',periodo:period,rows:rows});
+    const pill=document.getElementById('gsPill');
+    pill.textContent='guardando...';
+    setTimeout(()=>{pill.textContent=Object.keys(RULES).length+' reglas';},1500);
+  },2000); // wait 2s after last change before saving
 }
 function editRow(i){rows[i].d1='';rows[i].d2='';rows[i].src='pendiente';updateM();renderPend();renderDetalle();renderRes();showTab('pending');}
 
@@ -641,17 +731,21 @@ function showTab(n){
 async function closePeriod(){
   const box=document.getElementById('actStatus');
   box.classList.remove('hidden');box.className='status info';box.textContent='Cerrando período...';
-  // Collect new rules from all categorized rows
+  // Save rules
   const nr={};
   rows.filter(r=>!r.isCredit&&isDone(r)).forEach(r=>{nr[nrm(r.desc)]={d1:r.d1,d2:r.d2};});
-  // Save rules and history to Sheets
   await postGS({action:'saveRules',rules:nr});
-  await postGS({action:'saveHistory',rows:rows.filter(r=>!r.isCredit&&r.monto>0).map(r=>({fecha:r.fecha,desc:r.desc,titular:r.titular,d1:r.d1,d2:r.d2,monto:r.monto,periodo:period}))});
+  // Close period in Sheets (moves to HISTORIAL + clears PERIODO_ACTIVO)
+  await postGS({action:'closePeriod',periodo:period});
   // Update local rules
   RULES=Object.assign({},RULES,nr);
+  rows=[];abonos=[];period='';
   document.getElementById('gsPill').textContent=Object.keys(RULES).length+' reglas';
   document.getElementById('gsPill').className='gs-pill ok';
-  // Download processed Excel
+  document.getElementById('periodLabel').textContent='';
+  document.getElementById('results').classList.add('hidden');
+  document.getElementById('uploadTitle').textContent='Subir estado de cuenta';
+  document.getElementById('uploadSub').textContent='Período cerrado · sube el Excel del próximo mes';
   exportXL();
   box.className='status ok';
   box.textContent=Object.keys(nr).length+' reglas guardadas · período cerrado · Excel descargado';
@@ -662,6 +756,68 @@ function exportXL(){
   const ws=XLSX.utils.aoa_to_sheet(d);const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Movimientos Facturados');
   XLSX.writeFile(wb,'gastos_'+period.replace(/[\/ ]/g,'-')+'_procesado.xlsx');
+}
+
+// ── FILTER & SORT ─────────────────────────────────────────────
+let sortField='fecha', sortDir=-1; // -1 = desc, 1 = asc
+
+function applyFilters(){
+  const desc=(document.getElementById('fDesc').value||'').toLowerCase();
+  const tit=document.getElementById('fTit').value;
+  const d1=document.getElementById('fD1').value;
+  const cat=document.getElementById('fCat').value;
+  const src=document.getElementById('fSrc').value;
+  const desde=document.getElementById('fFechaDesde').value;
+  const hasta=document.getElementById('fFechaHasta').value;
+  const sp=rows.filter(r=>!r.isCredit&&r.monto>0);
+  let filtered=sp.filter(r=>{
+    if(desc&&!r.desc.toLowerCase().includes(desc))return false;
+    if(tit&&r.titular!==tit)return false;
+    if(d1&&r.d1!==d1)return false;
+    if(cat&&r.d2!==cat)return false;
+    if(src&&r.src!==src)return false;
+    if(desde&&r.fecha<desde)return false;
+    if(hasta&&r.fecha>hasta)return false;
+    return true;
+  });
+  filtered=sortRows(filtered);
+  document.getElementById('filterCount').textContent=filtered.length+' de '+sp.length;
+  renderDetalleRows(filtered);
+}
+
+function sortBy(field){
+  if(sortField===field)sortDir*=-1;
+  else{sortField=field;sortDir=field==='monto'?-1:-1;}
+  document.querySelectorAll('.sort-arrow').forEach(el=>el.textContent='');
+  const el=document.getElementById('sort-'+field);
+  if(el)el.textContent=sortDir===-1?'↓':'↑';
+  applyFilters();
+}
+
+function sortRows(arr){
+  return arr.slice().sort((a,b)=>{
+    let va=a[sortField]||'', vb=b[sortField]||'';
+    if(sortField==='monto'){va=Number(a.monto);vb=Number(b.monto);}
+    if(va<vb)return sortDir;
+    if(va>vb)return -sortDir;
+    return 0;
+  });
+}
+
+function clearFilters(){
+  ['fDesc','fTit','fD1','fCat','fSrc','fFechaDesde','fFechaHasta'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  document.getElementById('filterCount').textContent='';
+  applyFilters();
+}
+
+function populateCatFilter(){
+  const cats=[...new Set(rows.filter(r=>!r.isCredit&&r.d2).map(r=>r.d2))].sort();
+  const sel=document.getElementById('fCat');
+  if(!sel)return;
+  sel.innerHTML='<option value="">Categoría</option>'+cats.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
 }
 
 loadRules();
